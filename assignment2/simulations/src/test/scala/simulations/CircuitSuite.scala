@@ -10,7 +10,80 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
   val InverterDelay = 1
   val AndGateDelay = 3
   val OrGateDelay = 5
-  
+
+  test ("Test 4 output demux") {
+    val in, c1, c2, out1, out2, out3, out4 = new Wire
+    val controlIn = List(c1, c2)
+    val wireOut = List(out1, out2, out3, out4)
+    demux(in, controlIn, wireOut)
+
+    in.setSignal(false)
+    c1.setSignal(false)
+    c2.setSignal(false)
+    run
+
+    assert(out1.getSignal === false)
+    assert(out2.getSignal === false)
+    assert(out3.getSignal === false)
+    assert(out4.getSignal === false)
+
+    in.setSignal(true)
+    run
+
+    assert(out1.getSignal === true)
+    assert(out2.getSignal === false)
+    assert(out3.getSignal === false)
+    assert(out4.getSignal === false)
+
+    c1.setSignal(true)
+    run
+
+    assert(out1.getSignal === false)
+    assert(out2.getSignal === false)
+    assert(out3.getSignal === true)
+    assert(out4.getSignal === false)
+
+    c2.setSignal(true)
+    run
+
+    assert(out1.getSignal === false)
+    assert(out2.getSignal === false)
+    assert(out3.getSignal === false)
+    assert(out4.getSignal === true)
+
+    c1.setSignal(false)
+    run
+
+    assert(out1.getSignal === false)
+    assert(out2.getSignal === true)
+    assert(out3.getSignal === false)
+    assert(out4.getSignal === false)
+  }
+
+  test ("Test 2 output demux") {
+    val in, control, out1, out2 = new Wire
+    demux2(in, control, out1, out2)
+    in.setSignal(false)
+    control.setSignal(false)
+    run
+
+    assert(out1.getSignal === false)
+    assert(out2.getSignal === false)
+
+    in.setSignal(true)
+    run
+
+    assert(out1.getSignal === true, "First element should be selected")
+    assert(out2.getSignal === false, "Second element should be deselected")
+
+    control.setSignal(true)
+    run
+
+    assert(out1.getSignal === false, "First element should be deselected")
+    assert(out2.getSignal === true, "Second element should be selected")
+
+  }
+
   test("andGate example") {
     val in1, in2, out = new Wire
     andGate(in1, in2, out)
@@ -71,8 +144,31 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
     assert(out2.getSignal === true, "or 3")
   }
 
-  //
-  // to complete with tests for orGate, demux, ...
-  //
+  test ("Detect single element list") {
+
+    def matcher(a: List[Int]) ={
+      a match {
+        case head :: Nil =>
+          true
+        case head :: tail =>
+          false
+      }
+    }
+
+    assert(matcher(List(1,2)) === false, "Two element")
+    assert(matcher(List(1)) === true, "Single element")
+  }
+
+  test ("List splitter") {
+    def halver(a: List[Int]) = {
+      (a.slice(0, a.length/2), a.slice(a.length/2, a.length))
+    }
+
+    assert(halver(List(1, 2)) === (List(1), List(2)))
+    assert(halver(List(1, 2, 3, 4)) === (List(1, 2), List(3, 4)))
+
+  }
+
+
 
 }
