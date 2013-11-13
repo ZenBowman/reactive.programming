@@ -11,56 +11,39 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
   val AndGateDelay = 3
   val OrGateDelay = 5
 
-  test ("Test 4 output demux") {
+  test("Test 4 output demux") {
     val in, c1, c2, out1, out2, out3, out4 = new Wire
     val controlIn = List(c1, c2)
     val wireOut = List(out1, out2, out3, out4)
     demux(in, controlIn, wireOut)
+
+    def values = wireOut.map(_.getSignal)
 
     in.setSignal(false)
     c1.setSignal(false)
     c2.setSignal(false)
     run
 
-    assert(out1.getSignal === false)
-    assert(out2.getSignal === false)
-    assert(out3.getSignal === false)
-    assert(out4.getSignal === false)
+    assert(values === List(false, false, false, false))
 
     in.setSignal(true)
     run
-
-    assert(out1.getSignal === true)
-    assert(out2.getSignal === false)
-    assert(out3.getSignal === false)
-    assert(out4.getSignal === false)
+    assert(values === List(true, false, false, false))
 
     c1.setSignal(true)
     run
-
-    assert(out1.getSignal === false)
-    assert(out2.getSignal === false)
-    assert(out3.getSignal === true)
-    assert(out4.getSignal === false)
+    assert(values === List(false, false, true, false))
 
     c2.setSignal(true)
     run
-
-    assert(out1.getSignal === false)
-    assert(out2.getSignal === false)
-    assert(out3.getSignal === false)
-    assert(out4.getSignal === true)
+    assert(values === List(false, false, false, true))
 
     c1.setSignal(false)
     run
-
-    assert(out1.getSignal === false)
-    assert(out2.getSignal === true)
-    assert(out3.getSignal === false)
-    assert(out4.getSignal === false)
+    assert(values === List(false, true, false, false))
   }
 
-  test ("Test 2 output demux") {
+  test("Test 2 output demux") {
     val in, control, out1, out2 = new Wire
     demux2(in, control, out1, out2)
     in.setSignal(false)
@@ -90,17 +73,17 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
     in1.setSignal(false)
     in2.setSignal(false)
     run
-    
+
     assert(out.getSignal === false, "and 1")
 
     in1.setSignal(true)
     run
-    
+
     assert(out.getSignal === false, "and 2")
 
     in2.setSignal(true)
     run
-    
+
     assert(out.getSignal === true, "and 3")
   }
 
@@ -144,9 +127,9 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
     assert(out2.getSignal === true, "or 3")
   }
 
-  test ("Detect single element list") {
+  test("Detect single element list") {
 
-    def matcher(a: List[Int]) ={
+    def matcher(a: List[Int]) = {
       a match {
         case head :: Nil =>
           true
@@ -155,20 +138,19 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
       }
     }
 
-    assert(matcher(List(1,2)) === false, "Two element")
+    assert(matcher(List(1, 2)) === false, "Two element")
     assert(matcher(List(1)) === true, "Single element")
   }
 
-  test ("List splitter") {
+  test("List splitter") {
     def halver(a: List[Int]) = {
-      (a.slice(0, a.length/2), a.slice(a.length/2, a.length))
+      (a.slice(0, a.length / 2), a.slice(a.length / 2, a.length))
     }
 
-    assert(halver(List(1, 2)) === (List(1), List(2)))
-    assert(halver(List(1, 2, 3, 4)) === (List(1, 2), List(3, 4)))
+    assert(halver(List(1, 2)) ===(List(1), List(2)))
+    assert(halver(List(1, 2, 3, 4)) ===(List(1, 2), List(3, 4)))
 
   }
-
 
 
 }
