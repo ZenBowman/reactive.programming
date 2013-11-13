@@ -11,6 +11,46 @@ class CircuitSuite extends CircuitSimulator with FunSuite {
   val AndGateDelay = 3
   val OrGateDelay = 5
 
+  test("Test 8 output demux") {
+    val in, c1, c2, c3, out1, out2, out3, out4, out5, out6, out7, out8 = new Wire
+    val controlIn = List(c1, c2, c3)
+    val wireOut = List(out1, out2, out3, out4, out5, out6, out7, out8)
+    demux(in, controlIn, wireOut)
+
+    def values = wireOut.map(_.getSignal)
+
+    in.setSignal(false)
+    c1.setSignal(false)
+    c2.setSignal(false)
+    c3.setSignal(false)
+    run
+
+    assert(values === List(false, false, false, false, false, false, false, false))
+
+    in.setSignal(true)
+    run
+    assert(values === List(true, false, false, false, false, false, false, false), "Select 000")
+
+    c1.setSignal(true)
+    run
+    assert(values === List(false, false, false, false, true, false, false, false), "Select 100")
+
+    c2.setSignal(true)
+    run
+    assert(values === List(false, false, false, false, false, false, true, false), "Select 110")
+
+    c1.setSignal(false)
+    run
+    assert(values === List(false, false, true, false, false, false, false, false), "Select 010")
+
+
+    c1.setSignal(true)
+    c2.setSignal(true)
+    c3.setSignal(true)
+    run
+    assert(values === List(false, false, false, false, false, false, false, true), "Select 111")
+  }
+
   test("Test 4 output demux") {
     val in, c1, c2, out1, out2, out3, out4 = new Wire
     val controlIn = List(c1, c2)
