@@ -51,121 +51,152 @@ package object nodescala {
     }
 
 
+    /** Given a list of futures `fs`, returns the future holding the value of the future from `fs` that completed first.
+      * If the first completing future in `fs` fails, then the result is failed as well.
+      *
+      * E.g.:
+      *
+      * Future.any(List(Future { 1 }, Future { 2 }, Future { throw new Exception }))
+      *
+      * may return a `Future` succeeded with `1`, `2` or failed with an `Exception`.
+      */
+    def any[T](fs: List[Future[T]]): Future[T] = {
+      val p = Promise[T]
+      fs map {
+        x => x onComplete {
+          res => p.tryComplete(res)
+        }
+      }
+      p.future
+    }
 
 
-  /** Given a list of futures `fs`, returns the future holding the value of the future from `fs` that completed first.
-    * If the first completing future in `fs` fails, then the result is failed as well.
-    *
-    * E.g.:
-    *
-    * Future.any(List(Future { 1 }, Future { 2 }, Future { throw new Exception }))
-    *
-    * may return a `Future` succeeded with `1`, `2` or failed with an `Exception`.
-    */
-  def any[T](fs: List[Future[T]]): Future[T] = {
-    val p = Promise[T]
-    fs map {
-      x => x onComplete {
-        res => p.tryComplete(res)
+    /** Returns a future with a unit value that is completed after time `t`.
+      */
+    def delay(t: Duration): Future[Unit] = {
+      Future {
+        Thread.sleep(t.toSeconds)
       }
     }
-    p.future
+
+    /** Completes this future with user input.
+      */
+    def userInput(message: String): Future[String] = Future {
+      readLine(message)
+    }
+
+    /** Creates a cancellable context for an execution and runs it.
+      */
+    def run()(f: CancellationToken => Future[Unit]): Subscription = {
+      val ct = CancellationTokenSource()
+      f(ct.cancellationToken)
+      ct
+    }
+
+
   }
 
-
-  /** Returns a future with a unit value that is completed after time `t`.
+  /** Adds extension methods to future objects.
     */
-  def delay(t: Duration): Future[Unit] = ???
+  implicit class FutureOps[T](val f: Future[T]) extends AnyVal {
 
-  /** Completes this future with user input.
-    */
-  def userInput(message: String): Future[String] = Future {
-    readLine(message)
+    /** Returns the result of this future if it is completed now.
+      * Otherwise, throws a `NoSuchElementException`.
+      *
+      * Note: This method does not wait for the result.
+      * It is thus non-blocking.
+      * However, it is also non-deterministic -- it may throw or return a value
+      * depending on the current state of the `Future`.
+      */
+    def now: T = {
+      if (f.isCompleted) {
+        Await.result(f, 0 seconds)
+      } else {
+        throw new NoSuchElementException
+      }
+    }
+
+
+    /** Continues the computation of this future by taking the current future
+      * and mapping it into another future.
+      *
+      * The function `cont` is called only after the current future completes.
+      * The resulting future contains a value returned by `cont`.
+      */
+    def continueWith[S](cont: Future[T] => S): Future[S] = Future {
+      cont(f)
+    }
+
+
+    /** Continues the computation of this future by taking the result
+      * of the current future and mapping it into another future.
+      *
+      * The function `cont` is called only after the current future completes.
+      * The resulting future contains a value returned by `cont`.
+      */
+    def continue[S](cont: Try[T] => S): Future[S] = {
+      val p = Promise[S]
+      f onComplete {
+        t => p.complete(Success(cont(t)))
+      }
+      p.future
+    }
+
+
   }
 
-  /** Creates a cancellable context for an execution and runs it.
+  /** Subscription objects are used to be able to unsubscribe
+    * from some event source.
     */
-  def run()(f: CancellationToken => Future[Unit]): Subscription = ???
+  trait Subscription {
+    def unsubscribe(): Unit
+  }
 
-}
-
-/** Adds extension methods to future objects.
-  */
-implicit class FutureOps[T](val f: Future[T]) extends AnyVal {
-
-  /** Returns the result of this future if it is completed now.
-    * Otherwise, throws a `NoSuchElementException`.
-    *
-    * Note: This method does not wait for the result.
-    * It is thus non-blocking.
-    * However, it is also non-deterministic -- it may throw or return a value
-    * depending on the current state of the `Future`.
-    */
-  def now: T = ???
-
-  /** Continues the computation of this future by taking the current future
-    * and mapping it into another future.
-    *
-    * The function `cont` is called only after the current future completes.
-    * The resulting future contains a value returned by `cont`.
-    */
-  def continueWith[S](cont: Future[T] => S): Future[S] = ???
-
-  /** Continues the computation of this future by taking the result
-    * of the current future and mapping it into another future.
-    *
-    * The function `cont` is called only after the current future completes.
-    * The resulting future contains a value returned by `cont`.
-    */
-  def continue[S](cont: Try[T] => S): Future[S] = ???
-
-}
-
-/** Subscription objects are used to be able to unsubscribe
-  * from some event source.
-  */
-trait Subscription {
-  def unsubscribe(): Unit
-}
-
-object Subscription {
-  /** Given two subscriptions `s1` and `s2` returns a new composite subscription
-    * such that when the new composite subscription cancels both `s1` and `s2`
-    * when `unsubscribe` is called.
-    */
-  def apply(s1: Subscription, s2: Subscription) = new Subscription {
-    def unsubscribe() {
-      s1.unsubscribe()
-      s2.unsubscribe()
+  object Subscription {
+    /** Given two subscriptions `s1` and `s2` returns a new composite subscription
+      * such that when the new composite subscription cancels both `s1` and `s2`
+      * when `unsubscribe` is called.
+      */
+    def apply(s1: Subscription, s2: Subscription) = new Subscription {
+      def unsubscribe() {
+        s1.unsubscribe()
+        s2.unsubscribe()
+      }
     }
   }
-}
 
-/** Used to check if cancellation was requested.
-  */
-trait CancellationToken {
-  def isCancelled: Boolean
-
-  def nonCancelled = !isCancelled
-}
-
-/** The `CancellationTokenSource` is a special kind of `Subscription` that
-  * returns a `cancellationToken` which is cancelled by calling `unsubscribe`.
-  *
-  * After calling `unsubscribe` once, the associated `cancellationToken` will
-  * forever remain cancelled -- its `isCancelled` will return `false.
-  */
-trait CancellationTokenSource extends Subscription {
-  def cancellationToken: CancellationToken
-}
-
-/** Creates cancellation token sources.
-  */
-object CancellationTokenSource {
-  /** Creates a new `CancellationTokenSource`.
+  /** Used to check if cancellation was requested.
     */
-  def apply(): CancellationTokenSource = ???
-}
+  trait CancellationToken {
+    def isCancelled: Boolean
+
+    def nonCancelled = !isCancelled
+  }
+
+  /** The `CancellationTokenSource` is a special kind of `Subscription` that
+    * returns a `cancellationToken` which is cancelled by calling `unsubscribe`.
+    *
+    * After calling `unsubscribe` once, the associated `cancellationToken` will
+    * forever remain cancelled -- its `isCancelled` will return `false.
+    */
+  trait CancellationTokenSource extends Subscription {
+    def cancellationToken: CancellationToken
+  }
+
+  /** Creates cancellation token sources.
+    */
+  object CancellationTokenSource {
+    def apply(): CancellationTokenSource = new CancellationTokenSource {
+      val p = Promise[Unit]()
+      val cancellationToken = new CancellationToken {
+        def isCancelled = p.future.value != None
+      }
+
+      def unsubscribe() {
+        p.trySuccess(())
+      }
+    }
+  }
 
 }
 
