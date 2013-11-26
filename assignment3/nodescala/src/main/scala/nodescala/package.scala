@@ -32,38 +32,26 @@ package object nodescala {
       p.future
     }
 
+
     /** Given a list of futures `fs`, returns the future holding the list of values of all the futures from `fs`.
       * The returned future is completed only once all of the futures in `fs` have been completed.
       * The values in the list are in the same order as corresponding futures `fs`.
       * If any of the futures `fs` fails, the resulting future also fails.
       */
     def all[T](fs: List[Future[T]]): Future[List[T]] = {
-      val p = Promise[List[T]]
+      val empty = List[T]()
+      val emptyPromise = Promise.successful(empty)
 
-      fs.foldLeft(List[T]()) {
-        (lst, fut) => fut.onComplete(x => x match {
-          case Success(y) => y :: lst
-        })
+      val elems = fs.foldLeft(emptyPromise.future) {
+        (futureAccumulatedList, futureElement) =>
+          for (accumulatedList <- futureAccumulatedList; elem <- futureElement) yield (accumulatedList :+ elem)
       }
 
-      p.future
-    }
-
-    try {
-      val res = fs map {
-        x => x match {
-          case Success(b) => b
-          case Failure(b) => throw b
-        }
-      }
-      p.complete(res)
-    } catch {
-      t: Throwable => p.failure(t)
+      elems
     }
 
 
-    p.future
-  }
+
 
   /** Given a list of futures `fs`, returns the future holding the value of the future from `fs` that completed first.
     * If the first completing future in `fs` fails, then the result is failed as well.
