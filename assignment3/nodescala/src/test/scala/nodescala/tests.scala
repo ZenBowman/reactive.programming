@@ -1,7 +1,6 @@
 package nodescala
 
 
-
 import scala.language.postfixOps
 import scala.util.{Try, Success, Failure}
 import scala.collection._
@@ -54,9 +53,11 @@ class NodeScalaSuite extends FunSuite {
   class DummyExchange(val request: Request) extends Exchange {
     @volatile var response = ""
     val loaded = Promise[String]()
+
     def write(s: String) {
       response += s
     }
+
     def close() {
       loaded.success(response)
     }
@@ -149,6 +150,20 @@ class NodeScalaSuite extends FunSuite {
     test(immutable.Map("WorksForThree" -> List("Always works. Trust me.")))
 
     dummySubscription.unsubscribe()
+  }
+
+  test("delay") {
+
+    @volatile var test = 0;
+    val fd = Future.delay(2 seconds)
+    fd onComplete {
+      case _ => println("foo")
+      test = 42
+    }
+
+    Await.ready(fd, 5 seconds)
+    Thread.sleep(10) // allow time for callback to be called
+    assert(test === 42)
   }
 
 }

@@ -1,3 +1,4 @@
+import java.util.TimerTask
 import scala.collection.mutable.ListBuffer
 import scala.language.postfixOps
 import scala.util._
@@ -73,11 +74,24 @@ package object nodescala {
 
     /** Returns a future with a unit value that is completed after time `t`.
       */
-    def delay(t: Duration): Future[Unit] = {
-      Future {
-        Thread.sleep(t.toSeconds)
-      }
+
+    def delay(t: Duration): Future[Unit] = Future {
+      val nev = never[Unit]
+      Try { Await.ready(nev, t) }
     }
+
+    /*def delay2(t: Duration): Future[Unit] = {
+      val timer = new java.util.Timer()
+      val p = Promise[Unit]
+      timer.schedule(new TimerTask {
+        def run() {
+          p.complete(Success(()))
+        }
+      }, t.toMillis)
+
+      p.future
+    } */
+
 
     /** Completes this future with user input.
       */
