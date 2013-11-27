@@ -11,6 +11,7 @@ import java.util.concurrent.{Executor, ThreadPoolExecutor, TimeUnit, LinkedBlock
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
 import java.net.InetSocketAddress
 import scala.util.{Failure, Success}
+import scala.language.postfixOps
 
 /** Contains utilities common to the NodeScala© framework.
  */
@@ -37,6 +38,7 @@ trait NodeScala {
         return
       }
     }
+    exchange.close()
   }
 
   /** A server:
@@ -57,17 +59,15 @@ trait NodeScala {
       ct =>
         Future {
           while (ct.nonCancelled) {
-           // println("Handling next request")
-            listener.nextRequest() onComplete {
-              case Success(x) =>
-                respond(x._2, ct, handler(x._1))
-              case Failure(t) =>
-                //println("Next request failed")
-            }
+           blocking {
+             val res = Await.result(listener.nextRequest(), 10 seconds)
+             respond(res._2, ct, handler(res._1))
+           }
           }
           //println("Cancel requested, done handling requests")
         }
     }
+
     Subscription(ct, ct2)
   }
 
@@ -143,8 +143,8 @@ object NodeScala {
       val p = Promise[(Request, Exchange)]
       createContext {
         result => {
-          p.success((result.request, result))
           removeContext()
+          p.success((result.request, result))
         }
       }
       p.future

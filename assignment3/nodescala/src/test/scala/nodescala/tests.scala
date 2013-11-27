@@ -152,19 +152,6 @@ class NodeScalaSuite extends FunSuite {
     dummySubscription.unsubscribe()
   }
 
-  test("delay") {
-
-    @volatile var test = 0;
-    val fd = Future.delay(2 seconds)
-    fd onComplete {
-      case _ => println("foo")
-      test = 42
-    }
-
-    Await.ready(fd, 5 seconds)
-    Thread.sleep(10) // allow time for callback to be called
-    assert(test === 42)
-  }
 
 }
 

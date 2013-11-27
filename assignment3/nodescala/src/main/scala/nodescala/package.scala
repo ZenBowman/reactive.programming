@@ -77,7 +77,9 @@ package object nodescala {
 
     def delay(t: Duration): Future[Unit] = Future {
       val nev = never[Unit]
-      Try { Await.ready(nev, t) }
+      Try {
+        Await.ready(nev, t)
+      }
     }
 
     /*def delay2(t: Duration): Future[Unit] = {
@@ -110,6 +112,14 @@ package object nodescala {
 
   }
 
+
+  def continueWithImpl[T,S](f: Future[T], cont: Future[T] => S) = async {
+    val res = await {
+      f
+    }
+    cont(f)
+  }
+
   /** Adds extension methods to future objects.
     */
   implicit class FutureOps[T](val f: Future[T]) extends AnyVal {
@@ -137,8 +147,8 @@ package object nodescala {
       * The function `cont` is called only after the current future completes.
       * The resulting future contains a value returned by `cont`.
       */
-    def continueWith[S](cont: Future[T] => S): Future[S] = Future {
-      cont(f)
+    def continueWith[S](cont: Future[T] => S): Future[S] = {
+      continueWithImpl(f, cont)
     }
 
 
