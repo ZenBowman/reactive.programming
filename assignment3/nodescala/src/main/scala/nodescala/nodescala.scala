@@ -35,6 +35,7 @@ trait NodeScala {
     for (part <- response) {
       exchange.write(part)
       if (token.isCancelled) {
+        exchange.close()
         return
       }
     }
