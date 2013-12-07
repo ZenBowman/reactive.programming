@@ -7,83 +7,109 @@ import scala.collection.JavaConverters._
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{ Try, Success, Failure }
+import scala.util.{Try, Success, Failure}
 import rx.subscriptions.CompositeSubscription
-import rx.lang.scala.Observable
+import rx.lang.scala.{Observer, Observable}
 import observablex._
 import search._
+import rx.lang.scala.subjects.ReplaySubject
+import rx.lang.scala.Notification.{OnCompleted, OnError, OnNext}
 
 trait WikipediaApi {
 
   /** Returns a `Future` with a list of possible completions for a search `term`.
-   */
+    */
   def wikipediaSuggestion(term: String): Future[List[String]]
 
   /** Returns a `Future` with the contents of the Wikipedia page for the given search `term`.
-   */
+    */
   def wikipediaPage(term: String): Future[String]
 
   /** Returns an `Observable` with a list of possible completions for a search `term`.
-   */
+    */
   def wikiSuggestResponseStream(term: String): Observable[List[String]] = ObservableEx(wikipediaSuggestion(term))
 
   /** Returns an `Observable` with the contents of the Wikipedia page for the given search `term`.
-   */
+    */
   def wikiPageResponseStream(term: String): Observable[String] = ObservableEx(wikipediaPage(term))
 
   implicit class StringObservableOps(obs: Observable[String]) {
 
     /** Given a stream of search terms, returns a stream of search terms with spaces replaced by underscores.
-     *
-     * E.g. `"erik", "erik meijer", "martin` should become `"erik", "erik_meijer", "martin"`
-     */
-    def sanitized: Observable[String] = ???
+      *
+      * E.g. `"erik", "erik meijer", "martin` should become `"erik", "erik_meijer", "martin"`
+      */
+    def sanitized: Observable[String] = obs.map(x => x.replace(' ', '_'))
 
   }
 
   implicit class ObservableOps[T](obs: Observable[T]) {
 
     /** Given an observable that can possibly be completed with an error, returns a new observable
-     * with the same values wrapped into `Success` and the potential error wrapped into `Failure`.
-     *
-     * E.g. `1, 2, 3, !Exception!` should become `Success(1), Success(2), Success(3), Failure(Exception), !TerminateStream!`
-     */
-    def recovered: Observable[Try[T]] = ???
+      * with the same values wrapped into `Success` and the potential error wrapped into `Failure`.
+      *
+      * E.g. `1, 2, 3, !Exception!` should become `Success(1), Success(2), Success(3), Failure(Exception), !TerminateStream!`
+      */
+    def recovered: Observable[Try[T]] = {
+      val recoveredStream = ReplaySubject[Try[T]]()
+
+
+      def onNext(value: T): Unit = recoveredStream.onNext(Success(value))
+      def onError(error: Throwable): Unit = recoveredStream.onNext(Failure(error))
+      def onCompleted(): Unit = recoveredStream.onCompleted()
+
+      obs.subscribe(onNext _, onError _, onCompleted _)
+      recoveredStream
+    }
 
     /** Emits the events from the `obs` observable, until `totalSec` seconds have elapsed.
-     *
-     * After `totalSec` seconds, if `obs` is not yet completed, the result observable becomes completed.
-     *
-     * Note: uses the existing combinators on observables.
-     */
-    def timedOut(totalSec: Long): Observable[T] = ???
+      *
+      * After `totalSec` seconds, if `obs` is not yet completed, the result observable becomes completed.
+      *
+      * Note: uses the existing combinators on observables.
+      */
+    def timedOut(totalSec: Long): Observable[T] = {
+      val timedStream = ReplaySubject[T]()
+      val obsDelayer = Observable.interval(totalSec seconds)
+
+      def ontNext(value: T): Unit = timedStream.onNext(value)
+      def ontError(error: Throwable): Unit = timedStream.onError(error)
+      def ontCompleted(): Unit = timedStream.onCompleted()
+
+      def onTimeout(value: Long) = timedStream.onCompleted()
+
+      obsDelayer.subscribe(onNext = {onTimeout _})
+      obs.subscribe(ontNext _, ontError _, ontCompleted _)
+
+      timedStream
+    }
 
 
     /** Given a stream of events `obs` and a method `requestMethod` to map a request `T` into
-     * a stream of responses `S`, returns a stream of all the responses wrapped into a `Try`.
-     * The elements of the response stream should reflect the order of their corresponding events in `obs`.
-     *
-     * E.g. given a request stream:
-     *
-     * 1, 2, 3, 4, 5
-     *
-     * And a request method:
-     *
-     * num => if (num != 4) Observable.just(num) else Observable.error(new Exception)
-     *
-     * We should, for example, get:
-     *
-     * Success(1), Success(2), Success(3), Failure(new Exception), Success(5)
-     *
-     *
-     * Similarly:
-     *
-     * Observable(1, 2, 3).concatRecovered(num => Observable(num, num, num))
-     *
-     * should return:
-     *
-     * Observable(1, 1, 1, 2, 2, 2, 3, 3, 3)
-     */
+      * a stream of responses `S`, returns a stream of all the responses wrapped into a `Try`.
+      * The elements of the response stream should reflect the order of their corresponding events in `obs`.
+      *
+      * E.g. given a request stream:
+      *
+      * 1, 2, 3, 4, 5
+      *
+      * And a request method:
+      *
+      * num => if (num != 4) Observable.just(num) else Observable.error(new Exception)
+      *
+      * We should, for example, get:
+      *
+      * Success(1), Success(2), Success(3), Failure(new Exception), Success(5)
+      *
+      *
+      * Similarly:
+      *
+      * Observable(1, 2, 3).concatRecovered(num => Observable(num, num, num))
+      *
+      * should return:
+      *
+      * Observable(1, 1, 1, 2, 2, 2, 3, 3, 3)
+      */
     def concatRecovered[S](requestMethod: T => Observable[S]): Observable[Try[S]] = ???
 
   }
