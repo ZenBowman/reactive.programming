@@ -12,7 +12,7 @@ import rx.subscriptions.CompositeSubscription
 import rx.lang.scala.{Observer, Observable}
 import observablex._
 import search._
-import rx.lang.scala.subjects.ReplaySubject
+import rx.lang.scala.subjects.{PublishSubject, ReplaySubject}
 import rx.lang.scala.Notification.{OnCompleted, OnError, OnNext}
 
 trait WikipediaApi {
@@ -53,13 +53,23 @@ trait WikipediaApi {
     def recovered: Observable[Try[T]] = {
       val recoveredStream = ReplaySubject[Try[T]]()
 
+      obs.materialize.subscribe {
+        event =>
+          event match {
+            case OnNext(value: T) => value match {
+              case t: Throwable => recoveredStream.onNext(Failure(t))
+              case _ => recoveredStream.onNext(Success(value))
+            }
+            case OnError(value) => {
+              recoveredStream.onNext(Failure(value))
+              recoveredStream.onCompleted()
+            }
+            case OnCompleted(value) => recoveredStream.onCompleted()
+          }
+      }
 
-      def onNext(value: T): Unit = recoveredStream.onNext(Success(value))
-      def onError(error: Throwable): Unit = recoveredStream.onNext(Failure(error))
-      def onCompleted(): Unit = recoveredStream.onCompleted()
-
-      obs.subscribe(onNext _, onError _, onCompleted _)
       recoveredStream
+
     }
 
     /** Emits the events from the `obs` observable, until `totalSec` seconds have elapsed.
@@ -78,7 +88,9 @@ trait WikipediaApi {
 
       def onTimeout(value: Long) = timedStream.onCompleted()
 
-      obsDelayer.subscribe(onNext = {onTimeout _})
+      obsDelayer.subscribe(onNext = {
+        onTimeout _
+      })
       obs.subscribe(ontNext _, ontError _, ontCompleted _)
 
       timedStream
@@ -110,7 +122,9 @@ trait WikipediaApi {
       *
       * Observable(1, 1, 1, 2, 2, 2, 3, 3, 3)
       */
-    def concatRecovered[S](requestMethod: T => Observable[S]): Observable[Try[S]] = ???
+    def concatRecovered[S](requestMethod: T => Observable[S]): Observable[Try[S]] = {
+      obs.flatMap(x => requestMethod(x).recovered)
+    }
 
   }
 

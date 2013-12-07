@@ -64,6 +64,7 @@ trait SwingApi {
           val r: Reaction = {
             case ValueChanged(e) =>
               observer.onNext(field.text)
+            case _ => {}
           }
           field.subscribe(r)
           Subscription {
@@ -86,11 +87,11 @@ trait SwingApi {
       Observable {
         observer =>
           val r: Reaction = {
-            case ButtonClicked =>
-              observer.onNext(button)
+            case ButtonClicked(but) =>
+              observer.onNext(but)
           }
           button.subscribe(r)
-          Subscription{
+          Subscription {
             button.unsubscribe(r)
           }
       }
