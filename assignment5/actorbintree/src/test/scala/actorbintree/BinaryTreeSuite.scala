@@ -59,6 +59,7 @@ class BinaryTreeSuite(_system: ActorSystem) extends TestKit(_system) with FunSui
     expectMsg(ContainsResult(3, true))
   }
 
+
   test("instruction example") {
     val requester = TestProbe()
     val requesterRef = requester.ref
