@@ -84,10 +84,13 @@ class BinaryTreeSet extends Actor {
   /** Accepts `Operation` and `GC` messages. */
   val normal: Receive = {
     case x: Insert =>
+      processPendingOperations()
       root ! x
     case x: Contains =>
+      processPendingOperations()
       root ! x
     case x: Remove =>
+      processPendingOperations()
       root ! x
     case GC =>
       context.become(garbageCollecting)
@@ -95,6 +98,26 @@ class BinaryTreeSet extends Actor {
 
   }
 
+
+  def processOperation(oper: Operation) {
+    oper match {
+      case x: Insert =>
+        root ! x
+      case x: Contains =>
+        root ! x
+      case x: Remove =>
+        root ! x
+      case _  =>
+        println("Unknown operation")
+    }
+  }
+
+  def processPendingOperations() {
+    while (pendingQueue.length > 0) {
+      val oper = pendingQueue.dequeue()
+      processOperation(oper)
+    }
+  }
 
   // optional
   /** Handles messages while garbage collection is performed.
@@ -111,11 +134,8 @@ class BinaryTreeSet extends Actor {
       val oldRoot = root
       root = newRoot
       oldRoot ! Cleanup
-      for (elem <- pendingQueue) {
-        self ! elem
-      }
+      processPendingOperations()
       context.become(normal)
-
   }
 
 
