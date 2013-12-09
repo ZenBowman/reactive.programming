@@ -73,6 +73,7 @@ class BinaryTreeSet extends Actor {
   case object InitiateGarbageCollection
 
   def createRoot: ActorRef = context.actorOf(BinaryTreeNode.props(0, initiallyRemoved = true))
+
   var root = createRoot
 
   // optional
@@ -107,7 +108,7 @@ class BinaryTreeSet extends Actor {
         root ! x
       case x: Remove =>
         root ! x
-      case _  =>
+      case _ =>
         println("Unknown operation")
     }
   }
@@ -172,7 +173,7 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
       if (subtrees.contains(Left)) {
         subtrees(Left) ! Insert(requester, id, element)
       } else {
-        val lSubtree = context.actorOf(BinaryTreeNode.props(element, initiallyRemoved = false))
+        val lSubtree = context.actorOf(BinaryTreeNode.props(element, initiallyRemoved = false), s"node$element")
         subtrees = subtrees + (Left -> lSubtree)
         requester ! OperationFinished(id)
       }
@@ -181,7 +182,7 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
       if (subtrees.contains(Right)) {
         subtrees(Right) ! Insert(requester, id, element)
       } else {
-        val rSubtree = context.actorOf(BinaryTreeNode.props(element, initiallyRemoved = false))
+        val rSubtree = context.actorOf(BinaryTreeNode.props(element, initiallyRemoved = false), s"node$element")
         subtrees = subtrees + (Right -> rSubtree)
         requester ! OperationFinished(id)
       }
@@ -283,8 +284,7 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
     if (subtrees.contains(Right)) {
       subtrees(Right) ! Cleanup
     }
-    sender ! Cleanup
-    context.system.scheduler.scheduleOnce(5 seconds, self, PoisonPill)(context.dispatcher)
+    context.stop(self)
   }
 
   def copying: Receive = {
@@ -308,7 +308,6 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
         context.become(copying)
       }
     case Cleanup => cleanup()
-    case _ => {}
   }
 
 
