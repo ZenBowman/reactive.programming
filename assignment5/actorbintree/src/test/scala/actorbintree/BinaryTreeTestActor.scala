@@ -26,7 +26,8 @@ object BinaryTreeTester {
     topNode ! GC
     topNode ! Contains(tester, 2, 8)
 
-    Thread.sleep(2000)
+    Thread.sleep(1000)
+
     system.shutdown()
 
   }

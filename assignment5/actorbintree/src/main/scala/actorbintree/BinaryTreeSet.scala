@@ -276,15 +276,16 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
   }
 
   def cleanup() {
-    import scala.concurrent.duration._
-
+    numCleanupRequests += 1
+    /*
     if (subtrees.contains(Left)) {
       subtrees(Left) ! Cleanup
     }
     if (subtrees.contains(Right)) {
       subtrees(Right) ! Cleanup
-    }
-    context.stop(self)
+    }*/
+    println(s"Calling stop on node$elem")
+    //context.stop(self)
   }
 
   def copying: Receive = {
@@ -292,6 +293,8 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
     case OperationFinished(_) => decrementCopyOperations()
     case Cleanup => cleanup()
   }
+
+  var numCleanupRequests = 0
 
   // optional
   /** Handles `Operation` messages and `CopyTo` requests. */
@@ -307,7 +310,10 @@ class BinaryTreeNode(val elem: Int, initiallyRemoved: Boolean) extends Actor {
         copy(req, newRoot)
         context.become(copying)
       }
-    case Cleanup => cleanup()
+    case Cleanup =>
+      if (numCleanupRequests == 0) {
+        cleanup()
+      }
   }
 
 
